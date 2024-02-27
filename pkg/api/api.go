@@ -1,25 +1,43 @@
 package api
 
 import (
-	"learngo/pkg/services/albums"
-	album "learngo/pkg/services/albums/transport"
+	"learngo/pkg/db"
+	pokemon "learngo/pkg/services/pokemons/transport"
 	"log"
 	"net/http"
 
 	"github.com/julienschmidt/httprouter"
 )
 
-func Start() {
-	// albums slice to seed record album data.
-	var albumsData = []albums.Album{
-		{ID: "1", Title: "Blue Train", Artist: "John Coltrane", Price: 56.99},
-		{ID: "2", Title: "Jeru", Artist: "Gerry Mulligan", Price: 17.99},
-		{ID: "3", Title: "Sarah Vaughan and Clifford Brown", Artist: "Sarah Vaughan", Price: 39.99},
+// Config defines what the API requires to run
+type Config struct {
+	DBHost     string
+	DBPort     int
+	DBUser     string
+	DBPassword string
+	DBName     string
+}
+
+// Start initializes the API server, adding the reuired middleware and dependent services
+func Start(cfg *Config) {
+	conn, err := db.GetConnection(
+		cfg.DBHost,
+		cfg.DBPort,
+		cfg.DBUser,
+		cfg.DBPassword,
+		cfg.DBName)
+	if err != nil {
+		log.Fatal(err)
 	}
+	defer func() {
+		if conn != nil {
+			conn.Close()
+		}
+	}()
 
 	router := httprouter.New()
 
-	album.Activate(router, &albumsData)
+	pokemon.Activate(router, conn)
 
 	log.Fatal(http.ListenAndServe(":8080", router))
 }

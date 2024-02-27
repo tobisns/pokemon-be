@@ -1,0 +1,36 @@
+version: '3.8'
+services:
+  pokemon-api-service:
+    container_name: pokeomn-api-service
+    hostname: pokemon_api
+    build: .
+    ports:
+      - 18080:8080
+    env_file:
+      - .env
+    networks:
+      - pokemon-api-service
+    depends_on:
+      pokemon-api-db:
+        condition: service_healthy
+    restart: on-failure
+  pokemon-api-db:
+    container_name: pokemon-api-db
+    image: postgres:latest
+    hostname: pokemon_db
+    volumes:
+      - ./db/data:/var/lib/postgresql/data
+    healthcheck:
+      test: pg_isready -U postgres  -d pokemon_db
+      interval: 10s
+      timeout: 3s
+      retries: 20
+    env_file:
+      - .env
+    ports:
+      - 5434:5432
+    networks:
+      - pokemon-api-service
+
+networks:
+  pokemon-api-service:
