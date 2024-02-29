@@ -3,8 +3,6 @@ package pokemons
 // Pokemon is the nominal object used for interacting with pokemons.
 // This represents what is stored in the database.
 type Pokemon struct {
-	ID int `json:"id"`
-
 	Name          string `json:"name"`
 	ImageUrl      string `json:"image_url"`
 	EvolutionTree int    `json:"evo_tree_id"`

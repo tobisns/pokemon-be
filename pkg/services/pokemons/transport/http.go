@@ -7,7 +7,6 @@ import (
 	"learngo/pkg/services/pokemons/store"
 	"log"
 	"net/http"
-	"strconv"
 
 	"github.com/gorilla/schema"
 	"github.com/julienschmidt/httprouter"
@@ -37,13 +36,12 @@ func newHandler(router *httprouter.Router, as pokemons.Service) {
 		PokemonService: as,
 	}
 
-	router.GET("/pokemons/:id", h.Get)
+	router.GET("/pokemons/:name", h.Get)
 	router.GET("/pokemons", h.GetAll)
 }
 
 func (h *handler) Get(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
-	id, err := strconv.Atoi(params.ByName("id"))
-	pokemon, err := h.PokemonService.Get(r.Context(), id)
+	pokemon, err := h.PokemonService.Get(r.Context(), params.ByName("name"))
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 	if err != nil {
 		// No album with the id in the url has been found

@@ -9,8 +9,8 @@ import (
 )
 
 const (
-	selectPokemon      = `SELECT id, name, COALESCE(image_url, '') AS image_url, COALESCE(evo_tree_id, -1) AS evo_tree_id FROM pokemons WHERE id=$1`
-	selectManyPokemons = `SELECT id, name, COALESCE(image_url, '') AS image_url, COALESCE(evo_tree_id, -1) AS evo_tree_id FROM pokemons LIMIT $1 OFFSET $2`
+	selectPokemon      = `SELECT name, COALESCE(image_url, '') AS image_url, COALESCE(evo_tree_id, -1) AS evo_tree_id FROM pokemons WHERE name=$1`
+	selectManyPokemons = `SELECT name, COALESCE(image_url, '') AS image_url, COALESCE(evo_tree_id, -1) AS evo_tree_id FROM pokemons LIMIT $1 OFFSET $2`
 	searchPokemon      = `SELECT id, name, COALESCE(image_url, '') AS image_url, COALESCE(evo_tree_id, -1) AS evo_tree_id FROM pokemons WHERE name LIKE %$1% LIMIT $2 OFFSET $3`
 	insertPokemon      = `INSERT INTO pokemons (name, image_url, evo_tree_id)`
 	updatePokemonName  = `UPDATE pokemons SET name=$1, image_url=$2 WHERE id=$3`
@@ -27,11 +27,11 @@ func New(conn *sql.DB) pokemons.Repo {
 }
 
 // Get retrieves the article with the given id
-func (r *pokemonRepo) Get(ctx context.Context, id int) (pokemons.Pokemon, error) {
+func (r *pokemonRepo) Get(ctx context.Context, name string) (pokemons.Pokemon, error) {
 	var pr pokemons.Pokemon
 
-	err := r.DB.QueryRow(selectPokemon, id).
-		Scan(&pr.ID, &pr.Name, &pr.ImageUrl, &pr.EvolutionTree)
+	err := r.DB.QueryRow(selectPokemon, name).
+		Scan(&pr.Name, &pr.ImageUrl, &pr.EvolutionTree)
 	if err != nil {
 		log.Println(err)
 		return pr, errors.New("error")
@@ -52,7 +52,7 @@ func (r *pokemonRepo) GetAll(ctx context.Context, limit, offset int) ([]pokemons
 
 	for rows.Next() {
 		var pr pokemons.Pokemon
-		if err := rows.Scan(&pr.ID, &pr.Name, &pr.ImageUrl, &pr.EvolutionTree); err != nil {
+		if err := rows.Scan(&pr.Name, &pr.ImageUrl, &pr.EvolutionTree); err != nil {
 			log.Println(ctx, "unable to scan db rows: %s", err.Error())
 			return pl, errors.New("error")
 		}
@@ -65,9 +65,9 @@ func (r *pokemonRepo) GetAll(ctx context.Context, limit, offset int) ([]pokemons
 func (r *pokemonRepo) Find(ctx context.Context, query string, limit, offset int) ([]pokemons.Pokemon, error) {
 	return nil, nil
 }
-func (r *pokemonRepo) Create(ctx context.Context, pr pokemons.PokemonCreateUpdate) (int, error) {
-	return 0, nil
+func (r *pokemonRepo) Create(ctx context.Context, pr pokemons.PokemonCreateUpdate) (string, error) {
+	return "", nil
 }
-func (r *pokemonRepo) Update(ctx context.Context, pr pokemons.PokemonCreateUpdate, id int) error {
+func (r *pokemonRepo) Update(ctx context.Context, pr pokemons.PokemonCreateUpdate, name string) error {
 	return nil
 }
