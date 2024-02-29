@@ -9,12 +9,15 @@ import (
 )
 
 const (
-	selectPokemon      = `SELECT name, COALESCE(image_url, '') AS image_url, COALESCE(evo_tree_id, -1) AS evo_tree_id FROM pokemons WHERE name=$1`
-	selectManyPokemons = `SELECT name, COALESCE(image_url, '') AS image_url, COALESCE(evo_tree_id, -1) AS evo_tree_id FROM pokemons LIMIT $1 OFFSET $2`
-	searchPokemon      = `SELECT id, name, COALESCE(image_url, '') AS image_url, COALESCE(evo_tree_id, -1) AS evo_tree_id FROM pokemons WHERE name LIKE %$1% LIMIT $2 OFFSET $3`
-	insertPokemon      = `INSERT INTO pokemons (name, image_url, evo_tree_id)`
-	updatePokemonName  = `UPDATE pokemons SET name=$1, image_url=$2 WHERE id=$3`
-	deletePokemon      = `DELETE FROM pokemons WHERE id=$1`
+	selectPokemon       = `SELECT name, COALESCE(image_url, '') AS image_url, COALESCE(evo_tree_id, -1) AS evo_tree_id, COALESCE(height, 0) AS height, COALESCE(weight, 0) AS weight, COALESCE(hp, 0) as hp, COALESCE(atk, 0) AS atk, COALESCE(def, 0) AS def, COALESCE(sa, 0) AS sa, COALESCE(sd, 0) AS sd, COALESCE(spd, 0) AS spd FROM pokemons WHERE name=$1`
+	selectManyPokemons  = `SELECT name, COALESCE(image_url, '') AS image_url, COALESCE(evo_tree_id, -1) AS evo_tree_id, COALESCE(height, 0) AS height, COALESCE(weight, 0) AS weight, COALESCE(hp, 0) as hp, COALESCE(atk, 0) AS atk, COALESCE(def, 0) AS def, COALESCE(sa, 0) AS sa, COALESCE(sd, 0) as sd, COALESCE(spd, 0) as spd FROM pokemons LIMIT $1 OFFSET $2`
+	searchPokemon       = `SELECT name, COALESCE(image_url, '') AS image_url, COALESCE(evo_tree_id, -1) AS evo_tree_id, COALESCE(height, 0) AS height, COALESCE(weight, 0) AS weight, COALESCE(hp, 0) as hp, COALESCE(atk, 0) AS atk, COALESCE(def, 0) AS def, COALESCE(sa, 0) AS sa, COALESCE(sd, 0) as sd, COALESCE(spd, 0) as spd FROM pokemons WHERE name LIKE '%' || $1 || '%' LIMIT $2 OFFSET $3`
+	insertPokemon       = `INSERT INTO pokemons (name, image_url, height, weight, hp, atk, def, sa, sd, spd) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING name`
+	updatePokemon       = `UPDATE pokemons SET name = $1, image_url = $2, height = $3, weight = $4, hp = $5, atk = $6, def = $7, sa = $8, sd = $9, spd = $10 WHERE name = $11`
+	deletePokemon       = `DELETE FROM pokemons WHERE name=$1`
+	selectEvolutionTree = `SELECT id, level, pokemon_name FROM evo_tree WHERE id=$1`
+	newTreeId           = `SELECT new_tree() AS id`
+	insertEvolutionTree = `INSERT INTO evo_tree (id, pokemon_name, level) VALUES ($1, $2, $3)`
 )
 
 type pokemonRepo struct {
@@ -31,7 +34,7 @@ func (r *pokemonRepo) Get(ctx context.Context, name string) (pokemons.Pokemon, e
 	var pr pokemons.Pokemon
 
 	err := r.DB.QueryRow(selectPokemon, name).
-		Scan(&pr.Name, &pr.ImageUrl, &pr.EvolutionTree)
+		Scan(&pr.Name, &pr.ImageUrl, &pr.EvolutionTreeID, &pr.Height, &pr.Weight, &pr.Stat.HealthPoint, &pr.Stat.Attack, &pr.Stat.Defense, &pr.Stat.SpecialAttack, &pr.Stat.SpecialDefense, &pr.Stat.Speed)
 	if err != nil {
 		log.Println(err)
 		return pr, errors.New("error")
@@ -40,8 +43,8 @@ func (r *pokemonRepo) Get(ctx context.Context, name string) (pokemons.Pokemon, e
 	return pr, nil
 }
 
-func (r *pokemonRepo) GetAll(ctx context.Context, limit, offset int) ([]pokemons.Pokemon, error) {
-	pl := make([]pokemons.Pokemon, 0)
+func (r *pokemonRepo) GetAll(ctx context.Context, limit, offset int) (pokemons.Pokemons, error) {
+	var pl pokemons.Pokemons
 
 	rows, err := r.DB.Query(selectManyPokemons, limit, offset)
 	if err != nil {
@@ -52,22 +55,151 @@ func (r *pokemonRepo) GetAll(ctx context.Context, limit, offset int) ([]pokemons
 
 	for rows.Next() {
 		var pr pokemons.Pokemon
-		if err := rows.Scan(&pr.Name, &pr.ImageUrl, &pr.EvolutionTree); err != nil {
+		if err := rows.Scan(&pr.Name, &pr.ImageUrl, &pr.EvolutionTreeID, &pr.Height, &pr.Weight, &pr.Stat.HealthPoint, &pr.Stat.Attack, &pr.Stat.Defense, &pr.Stat.SpecialAttack, &pr.Stat.SpecialDefense, &pr.Stat.Speed); err != nil {
 			log.Println(ctx, "unable to scan db rows: %s", err.Error())
 			return pl, errors.New("error")
 		}
 
-		pl = append(pl, pr)
+		pl.Pokemons = append(pl.Pokemons, pr)
 	}
 
 	return pl, nil
 }
-func (r *pokemonRepo) Find(ctx context.Context, query string, limit, offset int) ([]pokemons.Pokemon, error) {
-	return nil, nil
+func (r *pokemonRepo) Find(ctx context.Context, query string, limit, offset int) (pokemons.Pokemons, error) {
+	var pl pokemons.Pokemons
+
+	rows, err := r.DB.Query(searchPokemon, query, limit, offset)
+	if err != nil {
+		log.Println(ctx, "unable to query db: %s", err.Error())
+		return pl, errors.New("error")
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var pr pokemons.Pokemon
+		if err := rows.Scan(&pr.Name, &pr.ImageUrl, &pr.EvolutionTreeID, &pr.Height, &pr.Weight, &pr.Stat.HealthPoint, &pr.Stat.Attack, &pr.Stat.Defense, &pr.Stat.SpecialAttack, &pr.Stat.SpecialDefense, &pr.Stat.Speed); err != nil {
+			log.Println(ctx, "unable to scan db rows: %s", err.Error())
+			return pl, errors.New("error")
+		}
+
+		pl.Pokemons = append(pl.Pokemons, pr)
+	}
+
+	return pl, nil
 }
-func (r *pokemonRepo) Create(ctx context.Context, pr pokemons.PokemonCreateUpdate) (string, error) {
-	return "", nil
+func (r *pokemonRepo) Create(ctx context.Context, pr *pokemons.PokemonCreateUpdate) (string, error) {
+	var name string
+	if err := r.DB.QueryRow(insertPokemon, (*pr).Name, (*pr).ImageUrl, (*pr).Height, (*pr).Weight, (*pr).Stat.HealthPoint, (*pr).Stat.Attack, (*pr).Stat.Defense, (*pr).Stat.SpecialAttack, (*pr).Stat.SpecialDefense, (*pr).Stat.Speed).Scan(&name); err != nil {
+		log.Println(ctx, "unable to create pokemon: %s", err.Error())
+		return "", errors.New("error")
+	}
+
+	log.Println(ctx, "created pokemon with name=%s", name)
+	return name, nil
 }
-func (r *pokemonRepo) Update(ctx context.Context, pr pokemons.PokemonCreateUpdate, name string) error {
+func (r *pokemonRepo) Update(ctx context.Context, name string, pr *pokemons.PokemonCreateUpdate) error {
+	_, err := r.DB.Exec(updatePokemon, (*pr).Name, (*pr).ImageUrl, (*pr).Height, (*pr).Weight, (*pr).Stat.HealthPoint, (*pr).Stat.Attack, (*pr).Stat.Defense, (*pr).Stat.SpecialAttack, (*pr).Stat.SpecialDefense, (*pr).Stat.Speed, name)
+	if err != nil {
+		log.Println(ctx, "unable to update pokemon (%s): %s", pr.Name, err.Error())
+		return errors.New("error")
+	}
 	return nil
+}
+
+func (r *pokemonRepo) Delete(ctx context.Context, name string) (string, error) {
+	result, err := r.DB.Exec(deletePokemon, name)
+	if err != nil {
+		log.Println(ctx, "unable to delete pokemon: %s", err.Error())
+		return "", errors.New("error")
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		log.Println(ctx, "error getting rows affected: %s", err.Error())
+		return "", errors.New("error")
+	}
+
+	if rowsAffected == 0 {
+		log.Println(ctx, "no pokemon with name=%s found to delete", name)
+		return "", errors.New("error")
+	}
+
+	log.Println(ctx, "deleted pokemon with name=%s", name)
+	return name, nil
+}
+
+func (r *pokemonRepo) GetEvoTree(ctx context.Context, id int) (pokemons.EvolutionTree, error) {
+	var et pokemons.EvolutionTree
+
+	rows, err := r.DB.Query(selectEvolutionTree, id)
+	if err != nil {
+		log.Println(ctx, "unable to query db: %s", err.Error())
+		return et, errors.New("error")
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var er pokemons.EvolutionData
+		if err := rows.Scan(&er.ID, &er.Level, &er.PokemonName); err != nil {
+			log.Println(ctx, "unable to scan db rows: %s", err.Error())
+			return et, errors.New("error")
+		}
+
+		et.EvolutionData = append(et.EvolutionData, er)
+	}
+
+	return et, nil
+}
+
+func (r *pokemonRepo) CreateEvoTree(ctx context.Context, ei *pokemons.EvolutionCreate) (int, error) {
+	var treeId int
+
+	tx, err := r.DB.Begin()
+	if err != nil {
+		log.Println(ctx, "unable to begin transaction: %s", err.Error())
+		return -1, errors.New("error")
+	}
+
+	tx.QueryRow(newTreeId).Scan(&treeId)
+	for _, data := range ei.EvolutionCreateData {
+		_, err := tx.Exec(insertEvolutionTree, treeId, data.PokemonName, data.Level)
+		if err != nil {
+			tx.Rollback()
+			log.Println(ctx, "unable to complete transaction: %s", err.Error())
+			return -1, errors.New("error")
+		}
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		log.Println(ctx, "unable to complete transaction: %s", err.Error())
+		return -1, errors.New("error")
+	}
+
+	return treeId, nil
+}
+
+func (r *pokemonRepo) InsertToEvoTree(ctx context.Context, id int, ei *pokemons.EvolutionCreate) (int, error) {
+	tx, err := r.DB.Begin()
+	if err != nil {
+		log.Println(ctx, "unable to begin transaction: %s", err.Error())
+		return -1, errors.New("error")
+	}
+
+	for _, data := range ei.EvolutionCreateData {
+		_, err := tx.Exec(insertEvolutionTree, id, data.PokemonName, data.Level)
+		if err != nil {
+			tx.Rollback()
+			log.Println(ctx, "unable to complete transaction: %s", err.Error())
+			return -1, errors.New("error")
+		}
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		log.Println(ctx, "unable to complete transaction: %s", err.Error())
+		return -1, errors.New("error")
+	}
+
+	return id, nil
 }
