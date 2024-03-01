@@ -3,7 +3,7 @@ package pokemons
 // Pokemon is the nominal object used for interacting with pokemons.
 // This represents what is stored in the database.
 type Pokemon struct {
-	Name            string      `json:"name"`
+	Name            string      `json:"name" binding:"required"`
 	ImageUrl        string      `json:"image_url"`
 	EvolutionTreeID int         `json:"evo_tree_id"`
 	Weight          int         `json:"weight"`
@@ -30,8 +30,6 @@ type PokemonDeleteResponse struct {
 	Message string `json:"message"`
 }
 
-// ArticleCreateUpdate is the request body that is
-// accepted for create and updates to articles.
 type PokemonCreateUpdate struct {
 	Name     string      `json:"name" binding:"required"`
 	ImageUrl string      `json:"image_url"`
