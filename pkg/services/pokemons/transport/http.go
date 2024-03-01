@@ -3,6 +3,7 @@ package transport
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"learngo/pkg/services/pokemons"
 	"learngo/pkg/services/pokemons/store"
 	"log"
@@ -45,13 +46,18 @@ func newHandler(router *httprouter.Router, as pokemons.Service) {
 	router.GET("/evolution_tree/:id", h.GetEvoTree)
 	router.POST("/evolution_tree", h.CreateEvoTree)
 	router.PUT("/evolution_tree/:id", h.InsertToEvoTree)
+	router.DELETE("/evolution_tree/:id", h.DeleteFromEvoTree)
+	router.GET("/types", h.GetTypes)
+	router.GET("/types/:id", h.GetSameTypes)
 }
 
 func (h *handler) Get(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
 	pokemon, err := h.PokemonService.Get(r.Context(), params.ByName("name"))
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 	if err != nil {
-		w.WriteHeader(http.StatusNotFound)
+		status, message := handleError(err)
+		http.Error(w, message.Error(), status)
+		return
 	}
 
 	response := pokemon
@@ -69,7 +75,8 @@ func (h *handler) GetAll(w http.ResponseWriter, r *http.Request, params httprout
 
 	ctx := r.Context()
 	if err := schema.NewDecoder().Decode(&q, r.URL.Query()); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		status, message := handleError(err)
+		http.Error(w, message.Error(), status)
 		return
 	}
 
@@ -77,7 +84,9 @@ func (h *handler) GetAll(w http.ResponseWriter, r *http.Request, params httprout
 	pokemons, err := h.PokemonService.GetAll(ctx, q.Limit, q.Offset, q.Query)
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 	if err != nil {
-		w.WriteHeader(http.StatusNotFound)
+		status, message := handleError(err)
+		http.Error(w, message.Error(), status)
+		return
 	}
 
 	response := pokemons
@@ -90,7 +99,8 @@ func (h *handler) Create(w http.ResponseWriter, r *http.Request, params httprout
 	var pc pokemons.PokemonCreateUpdate
 
 	if err := json.NewDecoder(r.Body).Decode(&pc); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		status, message := handleError(err)
+		http.Error(w, message.Error(), status)
 		return
 	}
 
@@ -98,7 +108,9 @@ func (h *handler) Create(w http.ResponseWriter, r *http.Request, params httprout
 	pokemon, err := h.PokemonService.Create(r.Context(), &pc)
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 	if err != nil {
-		w.WriteHeader(http.StatusNotFound)
+		status, message := handleError(err)
+		http.Error(w, message.Error(), status)
+		return
 	}
 
 	response := pokemon
@@ -111,7 +123,8 @@ func (h *handler) Update(w http.ResponseWriter, r *http.Request, params httprout
 	var pc pokemons.PokemonCreateUpdate
 
 	if err := json.NewDecoder(r.Body).Decode(&pc); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		status, message := handleError(err)
+		http.Error(w, message.Error(), status)
 		return
 	}
 
@@ -119,7 +132,9 @@ func (h *handler) Update(w http.ResponseWriter, r *http.Request, params httprout
 	pokemon, err := h.PokemonService.Update(r.Context(), params.ByName("name"), &pc)
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 	if err != nil {
-		w.WriteHeader(http.StatusNotFound)
+		status, message := handleError(err)
+		http.Error(w, message.Error(), status)
+		return
 	}
 
 	response := pokemon
@@ -132,7 +147,9 @@ func (h *handler) Delete(w http.ResponseWriter, r *http.Request, params httprout
 	pokemon, err := h.PokemonService.Delete(r.Context(), params.ByName("name"))
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 	if err != nil {
-		w.WriteHeader(http.StatusNotFound)
+		status, message := handleError(err)
+		http.Error(w, message.Error(), status)
+		return
 	}
 
 	response := pokemon
@@ -144,12 +161,16 @@ func (h *handler) Delete(w http.ResponseWriter, r *http.Request, params httprout
 func (h *handler) GetEvoTree(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
 	id, err := strconv.Atoi(params.ByName("id"))
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
+		status, message := handleError(err)
+		http.Error(w, message.Error(), status)
+		return
 	}
 	evoTree, err := h.PokemonService.GetEvoTree(r.Context(), id)
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 	if err != nil {
-		w.WriteHeader(http.StatusNotFound)
+		status, message := handleError(err)
+		http.Error(w, message.Error(), status)
+		return
 	}
 
 	response := evoTree
@@ -162,7 +183,8 @@ func (h *handler) CreateEvoTree(w http.ResponseWriter, r *http.Request, params h
 	var ec pokemons.EvolutionCreate
 
 	if err := json.NewDecoder(r.Body).Decode(&ec); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		status, message := handleError(err)
+		http.Error(w, message.Error(), status)
 		return
 	}
 
@@ -170,7 +192,9 @@ func (h *handler) CreateEvoTree(w http.ResponseWriter, r *http.Request, params h
 	evoTree, err := h.PokemonService.CreateEvoTree(r.Context(), &ec)
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 	if err != nil {
-		w.WriteHeader(http.StatusNotFound)
+		status, message := handleError(err)
+		http.Error(w, message.Error(), status)
+		return
 	}
 
 	response := evoTree
@@ -183,11 +207,14 @@ func (h *handler) InsertToEvoTree(w http.ResponseWriter, r *http.Request, params
 	var ec pokemons.EvolutionCreate
 	id, err := strconv.Atoi(params.ByName("id"))
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
+		status, message := handleError(err)
+		http.Error(w, message.Error(), status)
+		return
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&ec); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		status, message := handleError(err)
+		http.Error(w, message.Error(), status)
 		return
 	}
 
@@ -195,11 +222,102 @@ func (h *handler) InsertToEvoTree(w http.ResponseWriter, r *http.Request, params
 	evoTree, err := h.PokemonService.InsertToEvoTree(r.Context(), id, &ec)
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 	if err != nil {
-		w.WriteHeader(http.StatusNotFound)
+		status, message := handleError(err)
+		http.Error(w, message.Error(), status)
+		return
 	}
 
 	response := evoTree
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		panic(err)
+	}
+}
+
+func (h *handler) DeleteFromEvoTree(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
+	var ed pokemons.DeleteEvoData
+	id, err := strconv.Atoi(params.ByName("id"))
+	if err != nil {
+		status, message := handleError(err)
+		http.Error(w, message.Error(), status)
+		return
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&ed); err != nil {
+		status, message := handleError(err)
+		http.Error(w, message.Error(), status)
+		return
+	}
+
+	log.Printf("updating pokemon %v", ed)
+	evoTree, err := h.PokemonService.DeleteFromTree(r.Context(), id, &ed)
+	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+	if err != nil {
+		status, message := handleError(err)
+		http.Error(w, message.Error(), status)
+		return
+	}
+
+	response := evoTree
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		panic(err)
+	}
+}
+
+func (h *handler) GetTypes(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
+	types, err := h.PokemonService.GetTypes(r.Context())
+	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+	if err != nil {
+		status, message := handleError(err)
+		http.Error(w, message.Error(), status)
+		return
+	}
+
+	response := types
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		panic(err)
+	}
+}
+
+func (h *handler) GetSameTypes(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
+	id, err := strconv.Atoi(params.ByName("id"))
+	if err != nil {
+		status, message := handleError(err)
+		http.Error(w, message.Error(), status)
+		return
+	}
+
+	types, err := h.PokemonService.GetSameTypes(r.Context(), id)
+	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+	if err != nil {
+		status, message := handleError(err)
+		http.Error(w, message.Error(), status)
+		return
+	}
+
+	response := types
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		panic(err)
+	}
+}
+
+func handleError(e error) (int, error) {
+	switch e {
+	case pokemons.ErrNotFound:
+		return http.StatusNotFound, e
+	case pokemons.ErrUpdate:
+		fallthrough
+	case pokemons.ErrCreate:
+		return http.StatusInternalServerError, e
+	case pokemons.ErrQuery:
+		return http.StatusBadRequest, e
+	default:
+		if numErr, ok := e.(*strconv.NumError); ok && numErr.Err == strconv.ErrSyntax {
+			return http.StatusBadRequest, errors.New("bad request")
+		}
+		// Check if the error implements json.UnmarshalerError interface
+		if _, ok := e.(*json.UnmarshalTypeError); ok {
+			return http.StatusBadRequest, errors.New("bad request")
+		}
+		return http.StatusInternalServerError, e
 	}
 }

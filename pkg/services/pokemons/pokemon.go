@@ -15,6 +15,9 @@ type Repo interface {
 	GetEvoTree(ctx context.Context, id int) (EvolutionTree, error)
 	CreateEvoTree(ctx context.Context, ei *EvolutionCreate) (int, error)
 	InsertToEvoTree(ctx context.Context, id int, ei *EvolutionCreate) (int, error)
+	DeleteFromTree(ctx context.Context, id int, names *DeleteEvoData) (int, error)
+	GetTypes(ctx context.Context) (Types, error)
+	GetSameTypes(ctx context.Context, id int) (TypePokemonResponse, error)
 }
 
 // Service defines the service level contract that other services
@@ -28,6 +31,9 @@ type Service interface {
 	GetEvoTree(ctx context.Context, id int) (EvolutionTree, error)
 	CreateEvoTree(ctx context.Context, ei *EvolutionCreate) (EvolutionTree, error)
 	InsertToEvoTree(ctx context.Context, id int, ei *EvolutionCreate) (EvolutionTree, error)
+	DeleteFromTree(ctx context.Context, id int, names *DeleteEvoData) (EvolutionTree, error)
+	GetTypes(ctx context.Context) (Types, error)
+	GetSameTypes(ctx context.Context, id int) (TypePokemonResponse, error)
 }
 
 type pokemon struct {
@@ -91,4 +97,28 @@ func (s *pokemon) InsertToEvoTree(ctx context.Context, id int, ei *EvolutionCrea
 		return EvolutionTree{}, err
 	}
 	return s.repo.GetEvoTree(ctx, id)
+}
+
+func (s *pokemon) DeleteFromTree(ctx context.Context, id int, names *DeleteEvoData) (EvolutionTree, error) {
+	id, err := s.repo.DeleteFromTree(ctx, id, names)
+	if err != nil {
+		return EvolutionTree{}, err
+	}
+
+	et, err := s.repo.GetEvoTree(ctx, id)
+	if err == ErrNotFound {
+		return EvolutionTree{}, nil
+	} else if err != nil {
+		return EvolutionTree{}, err
+	}
+
+	return et, nil
+}
+
+func (s *pokemon) GetTypes(ctx context.Context) (Types, error) {
+	return s.repo.GetTypes(ctx)
+}
+
+func (s *pokemon) GetSameTypes(ctx context.Context, id int) (TypePokemonResponse, error) {
+	return s.repo.GetSameTypes(ctx, id)
 }

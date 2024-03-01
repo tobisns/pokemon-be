@@ -3,7 +3,6 @@ package store
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"learngo/pkg/services/pokemons"
 	"log"
 )
@@ -18,6 +17,9 @@ const (
 	selectEvolutionTree = `SELECT id, level, pokemon_name FROM evo_tree WHERE id=$1`
 	newTreeId           = `SELECT new_tree() AS id`
 	insertEvolutionTree = `INSERT INTO evo_tree (id, pokemon_name, level) VALUES ($1, $2, $3)`
+	deleteFromTree      = `DELETE FROM evo_tree WHERE id=$1 AND pokemon_name=$2`
+	selectTypes         = `SELECT * FROM type`
+	searchSameType      = `SELECT * FROM pokemon_type WHERE type_id=$1`
 )
 
 type pokemonRepo struct {
@@ -37,7 +39,7 @@ func (r *pokemonRepo) Get(ctx context.Context, name string) (pokemons.Pokemon, e
 		Scan(&pr.Name, &pr.ImageUrl, &pr.EvolutionTreeID, &pr.Height, &pr.Weight, &pr.Stat.HealthPoint, &pr.Stat.Attack, &pr.Stat.Defense, &pr.Stat.SpecialAttack, &pr.Stat.SpecialDefense, &pr.Stat.Speed)
 	if err != nil {
 		log.Println(err)
-		return pr, errors.New("error")
+		return pr, pokemons.ErrNotFound
 	}
 
 	return pr, nil
@@ -49,7 +51,7 @@ func (r *pokemonRepo) GetAll(ctx context.Context, limit, offset int) (pokemons.P
 	rows, err := r.DB.Query(selectManyPokemons, limit, offset)
 	if err != nil {
 		log.Println(ctx, "unable to query db: %s", err.Error())
-		return pl, errors.New("error")
+		return pl, pokemons.ErrQuery
 	}
 	defer rows.Close()
 
@@ -57,7 +59,7 @@ func (r *pokemonRepo) GetAll(ctx context.Context, limit, offset int) (pokemons.P
 		var pr pokemons.Pokemon
 		if err := rows.Scan(&pr.Name, &pr.ImageUrl, &pr.EvolutionTreeID, &pr.Height, &pr.Weight, &pr.Stat.HealthPoint, &pr.Stat.Attack, &pr.Stat.Defense, &pr.Stat.SpecialAttack, &pr.Stat.SpecialDefense, &pr.Stat.Speed); err != nil {
 			log.Println(ctx, "unable to scan db rows: %s", err.Error())
-			return pl, errors.New("error")
+			return pl, pokemons.ErrDB
 		}
 
 		pl.Pokemons = append(pl.Pokemons, pr)
@@ -65,13 +67,14 @@ func (r *pokemonRepo) GetAll(ctx context.Context, limit, offset int) (pokemons.P
 
 	return pl, nil
 }
+
 func (r *pokemonRepo) Find(ctx context.Context, query string, limit, offset int) (pokemons.Pokemons, error) {
 	var pl pokemons.Pokemons
 
 	rows, err := r.DB.Query(searchPokemon, query, limit, offset)
 	if err != nil {
 		log.Println(ctx, "unable to query db: %s", err.Error())
-		return pl, errors.New("error")
+		return pl, pokemons.ErrQuery
 	}
 	defer rows.Close()
 
@@ -79,7 +82,7 @@ func (r *pokemonRepo) Find(ctx context.Context, query string, limit, offset int)
 		var pr pokemons.Pokemon
 		if err := rows.Scan(&pr.Name, &pr.ImageUrl, &pr.EvolutionTreeID, &pr.Height, &pr.Weight, &pr.Stat.HealthPoint, &pr.Stat.Attack, &pr.Stat.Defense, &pr.Stat.SpecialAttack, &pr.Stat.SpecialDefense, &pr.Stat.Speed); err != nil {
 			log.Println(ctx, "unable to scan db rows: %s", err.Error())
-			return pl, errors.New("error")
+			return pl, pokemons.ErrDB
 		}
 
 		pl.Pokemons = append(pl.Pokemons, pr)
@@ -91,7 +94,7 @@ func (r *pokemonRepo) Create(ctx context.Context, pr *pokemons.PokemonCreateUpda
 	var name string
 	if err := r.DB.QueryRow(insertPokemon, (*pr).Name, (*pr).ImageUrl, (*pr).Height, (*pr).Weight, (*pr).Stat.HealthPoint, (*pr).Stat.Attack, (*pr).Stat.Defense, (*pr).Stat.SpecialAttack, (*pr).Stat.SpecialDefense, (*pr).Stat.Speed).Scan(&name); err != nil {
 		log.Println(ctx, "unable to create pokemon: %s", err.Error())
-		return "", errors.New("error")
+		return "", pokemons.ErrCreate
 	}
 
 	log.Println(ctx, "created pokemon with name=%s", name)
@@ -101,7 +104,7 @@ func (r *pokemonRepo) Update(ctx context.Context, name string, pr *pokemons.Poke
 	_, err := r.DB.Exec(updatePokemon, (*pr).Name, (*pr).ImageUrl, (*pr).Height, (*pr).Weight, (*pr).Stat.HealthPoint, (*pr).Stat.Attack, (*pr).Stat.Defense, (*pr).Stat.SpecialAttack, (*pr).Stat.SpecialDefense, (*pr).Stat.Speed, name)
 	if err != nil {
 		log.Println(ctx, "unable to update pokemon (%s): %s", pr.Name, err.Error())
-		return errors.New("error")
+		return pokemons.ErrUpdate
 	}
 	return nil
 }
@@ -110,18 +113,18 @@ func (r *pokemonRepo) Delete(ctx context.Context, name string) (string, error) {
 	result, err := r.DB.Exec(deletePokemon, name)
 	if err != nil {
 		log.Println(ctx, "unable to delete pokemon: %s", err.Error())
-		return "", errors.New("error")
+		return "", pokemons.ErrDB
 	}
 
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
 		log.Println(ctx, "error getting rows affected: %s", err.Error())
-		return "", errors.New("error")
+		return "", pokemons.ErrDB
 	}
 
 	if rowsAffected == 0 {
 		log.Println(ctx, "no pokemon with name=%s found to delete", name)
-		return "", errors.New("error")
+		return "", pokemons.ErrNotFound
 	}
 
 	log.Println(ctx, "deleted pokemon with name=%s", name)
@@ -134,7 +137,7 @@ func (r *pokemonRepo) GetEvoTree(ctx context.Context, id int) (pokemons.Evolutio
 	rows, err := r.DB.Query(selectEvolutionTree, id)
 	if err != nil {
 		log.Println(ctx, "unable to query db: %s", err.Error())
-		return et, errors.New("error")
+		return et, pokemons.ErrQuery
 	}
 	defer rows.Close()
 
@@ -142,10 +145,14 @@ func (r *pokemonRepo) GetEvoTree(ctx context.Context, id int) (pokemons.Evolutio
 		var er pokemons.EvolutionData
 		if err := rows.Scan(&er.ID, &er.Level, &er.PokemonName); err != nil {
 			log.Println(ctx, "unable to scan db rows: %s", err.Error())
-			return et, errors.New("error")
+			return et, pokemons.ErrCreate
 		}
 
 		et.EvolutionData = append(et.EvolutionData, er)
+	}
+
+	if et.EvolutionData == nil {
+		return et, pokemons.ErrNotFound
 	}
 
 	return et, nil
@@ -157,7 +164,7 @@ func (r *pokemonRepo) CreateEvoTree(ctx context.Context, ei *pokemons.EvolutionC
 	tx, err := r.DB.Begin()
 	if err != nil {
 		log.Println(ctx, "unable to begin transaction: %s", err.Error())
-		return -1, errors.New("error")
+		return -1, pokemons.ErrDB
 	}
 
 	tx.QueryRow(newTreeId).Scan(&treeId)
@@ -166,14 +173,14 @@ func (r *pokemonRepo) CreateEvoTree(ctx context.Context, ei *pokemons.EvolutionC
 		if err != nil {
 			tx.Rollback()
 			log.Println(ctx, "unable to complete transaction: %s", err.Error())
-			return -1, errors.New("error")
+			return -1, pokemons.ErrCreate
 		}
 	}
 
 	err = tx.Commit()
 	if err != nil {
 		log.Println(ctx, "unable to complete transaction: %s", err.Error())
-		return -1, errors.New("error")
+		return -1, pokemons.ErrDB
 	}
 
 	return treeId, nil
@@ -183,7 +190,7 @@ func (r *pokemonRepo) InsertToEvoTree(ctx context.Context, id int, ei *pokemons.
 	tx, err := r.DB.Begin()
 	if err != nil {
 		log.Println(ctx, "unable to begin transaction: %s", err.Error())
-		return -1, errors.New("error")
+		return -1, pokemons.ErrDB
 	}
 
 	for _, data := range ei.EvolutionCreateData {
@@ -191,15 +198,86 @@ func (r *pokemonRepo) InsertToEvoTree(ctx context.Context, id int, ei *pokemons.
 		if err != nil {
 			tx.Rollback()
 			log.Println(ctx, "unable to complete transaction: %s", err.Error())
-			return -1, errors.New("error")
+			return -1, pokemons.ErrCreate
 		}
 	}
 
 	err = tx.Commit()
 	if err != nil {
 		log.Println(ctx, "unable to complete transaction: %s", err.Error())
-		return -1, errors.New("error")
+		return -1, pokemons.ErrDB
 	}
 
 	return id, nil
+}
+
+func (r *pokemonRepo) DeleteFromTree(ctx context.Context, id int, names *pokemons.DeleteEvoData) (int, error) {
+	tx, err := r.DB.Begin()
+	if err != nil {
+		log.Println(ctx, "unable to begin transaction: %s", err.Error())
+		return -1, pokemons.ErrDB
+	}
+
+	for _, pokemon := range names.Pokemons {
+		_, err := tx.Exec(deleteFromTree, id, pokemon.Name)
+		if err != nil {
+			tx.Rollback()
+			log.Println(ctx, "unable to complete transaction: %s", err.Error())
+			return -1, pokemons.ErrNotFound
+		}
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		log.Println(ctx, "unable to complete transaction: %s", err.Error())
+		return -1, pokemons.ErrDB
+	}
+
+	return id, nil
+}
+
+func (r *pokemonRepo) GetTypes(ctx context.Context) (pokemons.Types, error) {
+	var tl pokemons.Types
+
+	rows, err := r.DB.Query(selectTypes)
+	if err != nil {
+		log.Println(ctx, "unable to query db: %s", err.Error())
+		return tl, pokemons.ErrQuery
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var tr pokemons.Type
+		if err := rows.Scan(&tr.ID, &tr.Name); err != nil {
+			log.Println(ctx, "unable to scan db rows: %s", err.Error())
+			return tl, pokemons.ErrDB
+		}
+
+		tl.Types = append(tl.Types, tr)
+	}
+
+	return tl, nil
+}
+
+func (r *pokemonRepo) GetSameTypes(ctx context.Context, id int) (pokemons.TypePokemonResponse, error) {
+	var pl pokemons.TypePokemonResponse
+
+	rows, err := r.DB.Query(searchSameType, id)
+	if err != nil {
+		log.Println(ctx, "unable to query db: %s", err.Error())
+		return pl, pokemons.ErrQuery
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var pr pokemons.TypePokemon
+		if err := rows.Scan(&pr.Name, &pr.TypeId); err != nil {
+			log.Println(ctx, "unable to scan db rows: %s", err.Error())
+			return pl, pokemons.ErrCreate
+		}
+
+		pl.Pokemons = append(pl.Pokemons, pr)
+	}
+
+	return pl, nil
 }

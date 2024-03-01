@@ -55,6 +55,28 @@ type EvolutionTree struct {
 	EvolutionData []EvolutionData `json:"evolution_data"`
 }
 
+type DeleteEvoData struct {
+	Pokemons []Pokemon `json:"pokemons" binding:"required"`
+}
+
 type EvolutionCreate struct {
 	EvolutionCreateData []EvolutionCreateData `json:"evolution_create"`
+}
+
+type Type struct {
+	ID   int    `json:"id" binding:"required"`
+	Name string `json:"name" binding:"required"`
+}
+
+type Types struct {
+	Types []Type `json:"types"`
+}
+
+type TypePokemon struct {
+	Name   string `json:"name" binding:"required"`
+	TypeId int    `json:"type_id" binding:"required"`
+}
+
+type TypePokemonResponse struct {
+	Pokemons []TypePokemon `json:"pokemons"`
 }

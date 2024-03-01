@@ -17,7 +17,7 @@ CREATE TABLE evo_tree (
     id INTEGER NOT NULL,
     level INTEGER NOT NULL,
     pokemon_name VARCHAR(32),
-    PRIMARY KEY (id, pokemon_name),
+    PRIMARY KEY (pokemon_name),
     FOREIGN KEY (pokemon_name) REFERENCES pokemons(name) ON DELETE CASCADE ON UPDATE CASCADE
 );
 

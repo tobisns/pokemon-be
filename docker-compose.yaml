@@ -17,7 +17,7 @@ services:
   pokemon-api-db:
     container_name: pokemon-api-db
     image: postgres:latest
-    hostname: pokemon_db
+    hostname: ${DB_HOST}
     volumes:
       - ./db/data:/var/lib/postgresql/data
     healthcheck:
@@ -28,7 +28,7 @@ services:
     env_file:
       - .env
     ports:
-      - 5434:5432
+      - ${HOST_DB_PORT}:${DB_PORT}
     networks:
       - pokemon-api-service
 
