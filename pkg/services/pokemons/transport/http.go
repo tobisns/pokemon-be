@@ -6,6 +6,7 @@ import (
 	"errors"
 	"learngo/pkg/services/pokemons"
 	"learngo/pkg/services/pokemons/store"
+	auth "learngo/pkg/utils/middlewares"
 	"log"
 	"net/http"
 	"strconv"
@@ -25,28 +26,32 @@ type ApiError struct {
 
 type handler struct {
 	PokemonService pokemons.Service
+	Secret         string
 }
 
 // Activate sets all the services required for articles and registers all the endpoints with the engine.
-func Activate(router *httprouter.Router, db *sql.DB) {
+func Activate(router *httprouter.Router, db *sql.DB, secret *string) {
 	pokemonService := pokemons.New(store.New(db))
-	newHandler(router, pokemonService)
+	newHandler(router, pokemonService, secret)
 }
 
-func newHandler(router *httprouter.Router, as pokemons.Service) {
+func newHandler(router *httprouter.Router, as pokemons.Service, secret *string) {
 	h := handler{
 		PokemonService: as,
+		Secret:         *secret,
 	}
+
+	auth := auth.New(h.Secret)
 
 	router.GET("/pokemons/:name", h.Get)
 	router.GET("/pokemons", h.GetAll)
-	router.POST("/pokemons", h.Create)
-	router.PUT("/pokemons/:name", h.Update)
-	router.DELETE("/pokemons/:name", h.Delete)
+	router.POST("/pokemons", auth.Authenticate(h.Create))
+	router.PUT("/pokemons/:name", auth.Authenticate(h.Update))
+	router.DELETE("/pokemons/:name", auth.Authenticate(h.Delete))
 	router.GET("/evolution_tree/:id", h.GetEvoTree)
-	router.POST("/evolution_tree", h.CreateEvoTree)
-	router.PUT("/evolution_tree/:id", h.InsertToEvoTree)
-	router.DELETE("/evolution_tree/:id", h.DeleteFromEvoTree)
+	router.POST("/evolution_tree", auth.Authenticate(h.CreateEvoTree))
+	router.PUT("/evolution_tree/:id", auth.Authenticate(h.InsertToEvoTree))
+	router.DELETE("/evolution_tree/:id", auth.Authenticate(h.DeleteFromEvoTree))
 	router.GET("/types", h.GetTypes)
 	router.GET("/types/:id", h.GetSameTypes)
 }

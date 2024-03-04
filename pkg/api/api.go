@@ -3,6 +3,7 @@ package api
 import (
 	"learngo/pkg/db"
 	pokemon "learngo/pkg/services/pokemons/transport"
+	user "learngo/pkg/services/users/transport"
 	"log"
 	"net/http"
 
@@ -16,6 +17,7 @@ type Config struct {
 	DBUser     string
 	DBPassword string
 	DBName     string
+	Secret     string
 }
 
 // Start initializes the API server, adding the reuired middleware and dependent services
@@ -37,7 +39,8 @@ func Start(cfg *Config) {
 
 	router := httprouter.New()
 
-	pokemon.Activate(router, conn)
+	pokemon.Activate(router, conn, &cfg.Secret)
+	user.Activate(router, conn, &cfg.Secret)
 
 	log.Fatal(http.ListenAndServe(":8080", router))
 }

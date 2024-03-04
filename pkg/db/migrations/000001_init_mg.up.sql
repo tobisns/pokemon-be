@@ -32,6 +32,12 @@ CREATE TABLE pokemon_type (
     PRIMARY KEY (pokemon, type_id)
 );
 
+CREATE TABLE users (
+    username VARCHAR(32) PRIMARY KEY,
+    password CHAR(64),
+    admin BOOLEAN DEFAULT FALSE
+);
+
 CREATE OR REPLACE FUNCTION set_evo_tree_id()
 RETURNS TRIGGER AS $$
 BEGIN

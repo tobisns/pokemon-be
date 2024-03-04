@@ -24,5 +24,6 @@ func main() {
 		DBUser:     os.Getenv("POSTGRES_USER"),
 		DBPassword: os.Getenv("POSTGRES_PASSWORD"),
 		DBName:     os.Getenv("POSTGRES_DB"),
+		Secret:     os.Getenv("SECRET"),
 	})
 }
