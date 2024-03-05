@@ -9,11 +9,21 @@ type Pokemon struct {
 	Weight          int         `json:"weight"`
 	Height          int         `json:"height"`
 	Stat            PokemonStat `json:"stat"`
+	Types           []Type      `json:"types"`
+}
+
+type PokemonLight struct {
+	Name     string `json:"name" binding:"required"`
+	ImageUrl string `json:"image_url"`
 }
 
 // Pokemons is used to present a list of pokemons in a JSON response.
 type Pokemons struct {
-	Pokemons []Pokemon `json:"pokemons"`
+	Pokemons []PokemonLight `json:"pokemons"`
+}
+
+type PokemonTypeCreateAssign struct {
+	Name string `json:"name" binding:"required"`
 }
 
 type PokemonStat struct {

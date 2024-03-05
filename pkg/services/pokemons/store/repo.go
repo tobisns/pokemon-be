@@ -9,8 +9,8 @@ import (
 
 const (
 	selectPokemon       = `SELECT name, COALESCE(image_url, '') AS image_url, COALESCE(evo_tree_id, -1) AS evo_tree_id, COALESCE(height, 0) AS height, COALESCE(weight, 0) AS weight, COALESCE(hp, 0) as hp, COALESCE(atk, 0) AS atk, COALESCE(def, 0) AS def, COALESCE(sa, 0) AS sa, COALESCE(sd, 0) AS sd, COALESCE(spd, 0) AS spd FROM pokemons WHERE name=$1`
-	selectManyPokemons  = `SELECT name, COALESCE(image_url, '') AS image_url, COALESCE(evo_tree_id, -1) AS evo_tree_id, COALESCE(height, 0) AS height, COALESCE(weight, 0) AS weight, COALESCE(hp, 0) as hp, COALESCE(atk, 0) AS atk, COALESCE(def, 0) AS def, COALESCE(sa, 0) AS sa, COALESCE(sd, 0) as sd, COALESCE(spd, 0) as spd FROM pokemons LIMIT $1 OFFSET $2`
-	searchPokemon       = `SELECT name, COALESCE(image_url, '') AS image_url, COALESCE(evo_tree_id, -1) AS evo_tree_id, COALESCE(height, 0) AS height, COALESCE(weight, 0) AS weight, COALESCE(hp, 0) as hp, COALESCE(atk, 0) AS atk, COALESCE(def, 0) AS def, COALESCE(sa, 0) AS sa, COALESCE(sd, 0) as sd, COALESCE(spd, 0) as spd FROM pokemons WHERE name LIKE '%' || $1 || '%' LIMIT $2 OFFSET $3`
+	selectManyPokemons  = `SELECT name, COALESCE(image_url, '') AS image_url FROM pokemons LIMIT $1 OFFSET $2`
+	searchPokemon       = `SELECT name, COALESCE(image_url, '') AS image_url FROM pokemons WHERE name LIKE '%' || $1 || '%' LIMIT $2 OFFSET $3`
 	insertPokemon       = `INSERT INTO pokemons (name, image_url, height, weight, hp, atk, def, sa, sd, spd) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING name`
 	updatePokemon       = `UPDATE pokemons SET name = $1, image_url = $2, height = $3, weight = $4, hp = $5, atk = $6, def = $7, sa = $8, sd = $9, spd = $10 WHERE name = $11`
 	deletePokemon       = `DELETE FROM pokemons WHERE name=$1`
@@ -20,6 +20,9 @@ const (
 	deleteFromTree      = `DELETE FROM evo_tree WHERE id=$1 AND pokemon_name=$2`
 	selectTypes         = `SELECT * FROM type`
 	searchSameType      = `SELECT * FROM pokemon_type WHERE type_id=$1`
+	insertType          = `INSERT INTO type (name) VALUES ($1) RETURNING name, id`
+	insertPokemonType   = `INSERT INTO pokemon_type (pokemon, type_id) VALUES ($1, $2) RETURNING pokemon`
+	selectPokemonTypes  = `SELECT pt.type_id, t.name FROM pokemon_type pt JOIN type t ON pt.type_id = t.id WHERE pt.pokemon=$1`
 )
 
 type pokemonRepo struct {
@@ -56,8 +59,8 @@ func (r *pokemonRepo) GetAll(ctx context.Context, limit, offset int) (pokemons.P
 	defer rows.Close()
 
 	for rows.Next() {
-		var pr pokemons.Pokemon
-		if err := rows.Scan(&pr.Name, &pr.ImageUrl, &pr.EvolutionTreeID, &pr.Height, &pr.Weight, &pr.Stat.HealthPoint, &pr.Stat.Attack, &pr.Stat.Defense, &pr.Stat.SpecialAttack, &pr.Stat.SpecialDefense, &pr.Stat.Speed); err != nil {
+		var pr pokemons.PokemonLight
+		if err := rows.Scan(&pr.Name, &pr.ImageUrl); err != nil {
 			log.Println(ctx, "unable to scan db rows: %s", err.Error())
 			return pl, pokemons.ErrDB
 		}
@@ -79,8 +82,8 @@ func (r *pokemonRepo) Find(ctx context.Context, query string, limit, offset int)
 	defer rows.Close()
 
 	for rows.Next() {
-		var pr pokemons.Pokemon
-		if err := rows.Scan(&pr.Name, &pr.ImageUrl, &pr.EvolutionTreeID, &pr.Height, &pr.Weight, &pr.Stat.HealthPoint, &pr.Stat.Attack, &pr.Stat.Defense, &pr.Stat.SpecialAttack, &pr.Stat.SpecialDefense, &pr.Stat.Speed); err != nil {
+		var pr pokemons.PokemonLight
+		if err := rows.Scan(&pr.Name, &pr.ImageUrl); err != nil {
 			log.Println(ctx, "unable to scan db rows: %s", err.Error())
 			return pl, pokemons.ErrDB
 		}
@@ -280,4 +283,49 @@ func (r *pokemonRepo) GetSameTypes(ctx context.Context, id int) (pokemons.TypePo
 	}
 
 	return pl, nil
+}
+
+func (r *pokemonRepo) CreateType(ctx context.Context, name string) (pokemons.Type, error) {
+	var pt pokemons.Type
+	if err := r.DB.QueryRow(insertType, name).Scan(&pt.Name, &pt.ID); err != nil {
+		log.Println(ctx, "unable to create type: %s", err.Error())
+		return pokemons.Type{}, pokemons.ErrCreate
+	}
+
+	log.Println(ctx, "created type with name=%s", name)
+	return pt, nil
+}
+
+func (r *pokemonRepo) AssignType(ctx context.Context, name string, typeId int) (string, error) {
+	var pn string
+	if err := r.DB.QueryRow(insertPokemonType, name, typeId).Scan(&pn); err != nil {
+		log.Println(ctx, "unable to assign type: %s", err.Error())
+		return "", pokemons.ErrCreate
+	}
+
+	log.Println(ctx, "assigned type to name=%s", pn)
+	return pn, nil
+}
+
+func (r *pokemonRepo) GetPokemonTypes(ctx context.Context, name string) (pokemons.Types, error) {
+	var tl pokemons.Types
+
+	rows, err := r.DB.Query(selectPokemonTypes, name)
+	if err != nil {
+		log.Println(ctx, "unable to query db: %s", err.Error())
+		return tl, pokemons.ErrQuery
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var tr pokemons.Type
+		if err := rows.Scan(&tr.ID, &tr.Name); err != nil {
+			log.Println(ctx, "unable to scan db rows: %s", err.Error())
+			return tl, pokemons.ErrDB
+		}
+
+		tl.Types = append(tl.Types, tr)
+	}
+
+	return tl, nil
 }

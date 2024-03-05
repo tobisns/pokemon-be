@@ -107,10 +107,16 @@ func (h *handler) Login(w http.ResponseWriter, r *http.Request, params httproute
 
 func (h *handler) Logout(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
 	// immediately clear the token cookie
-	http.SetCookie(w, &http.Cookie{
+	cookie := http.Cookie{
 		Name:    "token",
-		Expires: time.Now(),
-	})
+		Value:   "",
+		Path:    "/",
+		Expires: time.Unix(0, 0),
+
+		HttpOnly: true,
+	}
+
+	http.SetCookie(w, &cookie)
 }
 
 func handleError(e error) (int, error) {

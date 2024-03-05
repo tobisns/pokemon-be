@@ -54,6 +54,8 @@ func newHandler(router *httprouter.Router, as pokemons.Service, secret *string) 
 	router.DELETE("/evolution_tree/:id", auth.Authenticate(h.DeleteFromEvoTree))
 	router.GET("/types", h.GetTypes)
 	router.GET("/types/:id", h.GetSameTypes)
+	router.POST("/types", auth.Authenticate(h.CreateType))
+	router.POST("/types/:id", auth.Authenticate(h.AssignType))
 }
 
 func (h *handler) Get(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
@@ -300,6 +302,61 @@ func (h *handler) GetSameTypes(w http.ResponseWriter, r *http.Request, params ht
 	}
 
 	response := types
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		panic(err)
+	}
+}
+
+func (h *handler) CreateType(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
+	var pt pokemons.PokemonTypeCreateAssign
+
+	if err := json.NewDecoder(r.Body).Decode(&pt); err != nil {
+		status, message := handleError(err)
+		http.Error(w, message.Error(), status)
+		return
+	}
+
+	log.Printf("creating type %v", pt)
+	pokemonType, err := h.PokemonService.CreateType(r.Context(), pt.Name)
+	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+	if err != nil {
+		status, message := handleError(err)
+		http.Error(w, message.Error(), status)
+		return
+	}
+
+	response := pokemonType
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		panic(err)
+	}
+}
+
+func (h *handler) AssignType(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
+	var pn pokemons.PokemonTypeCreateAssign
+
+	id, err := strconv.Atoi(params.ByName("id"))
+	if err != nil {
+		status, message := handleError(err)
+		http.Error(w, message.Error(), status)
+		return
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&pn); err != nil {
+		status, message := handleError(err)
+		http.Error(w, message.Error(), status)
+		return
+	}
+
+	log.Printf("creating type %v", pn)
+	pokemon, err := h.PokemonService.AssignType(r.Context(), pn.Name, id)
+	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+	if err != nil {
+		status, message := handleError(err)
+		http.Error(w, message.Error(), status)
+		return
+	}
+
+	response := pokemon
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		panic(err)
 	}

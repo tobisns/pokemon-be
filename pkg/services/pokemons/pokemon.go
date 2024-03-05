@@ -18,6 +18,9 @@ type Repo interface {
 	DeleteFromTree(ctx context.Context, id int, names *DeleteEvoData) (int, error)
 	GetTypes(ctx context.Context) (Types, error)
 	GetSameTypes(ctx context.Context, id int) (TypePokemonResponse, error)
+	GetPokemonTypes(ctx context.Context, name string) (Types, error)
+	CreateType(ctx context.Context, name string) (Type, error)
+	AssignType(ctx context.Context, name string, typeId int) (string, error)
 }
 
 // Service defines the service level contract that other services
@@ -34,6 +37,8 @@ type Service interface {
 	DeleteFromTree(ctx context.Context, id int, names *DeleteEvoData) (EvolutionTree, error)
 	GetTypes(ctx context.Context) (Types, error)
 	GetSameTypes(ctx context.Context, id int) (TypePokemonResponse, error)
+	CreateType(ctx context.Context, name string) (Type, error)
+	AssignType(ctx context.Context, pokemon string, typeId int) (Pokemon, error)
 }
 
 type pokemon struct {
@@ -46,7 +51,18 @@ func New(repo Repo) Service {
 }
 
 func (s *pokemon) Get(ctx context.Context, name string) (Pokemon, error) {
-	return s.repo.Get(ctx, name)
+	pokemon, err := s.repo.Get(ctx, name)
+	if err != nil {
+		return Pokemon{}, err
+	}
+
+	types, err := s.repo.GetPokemonTypes(ctx, name)
+	if err != nil {
+		return Pokemon{}, err
+	}
+
+	pokemon.Types = types.Types
+	return pokemon, nil
 }
 
 func (s *pokemon) GetAll(ctx context.Context, limit, offset int, query string) (Pokemons, error) {
@@ -121,4 +137,22 @@ func (s *pokemon) GetTypes(ctx context.Context) (Types, error) {
 
 func (s *pokemon) GetSameTypes(ctx context.Context, id int) (TypePokemonResponse, error) {
 	return s.repo.GetSameTypes(ctx, id)
+}
+
+func (s *pokemon) CreateType(ctx context.Context, name string) (Type, error) {
+	createdType, err := s.repo.CreateType(ctx, name)
+	if err != nil {
+		return Type{}, err
+	}
+
+	return createdType, nil
+}
+
+func (s *pokemon) AssignType(ctx context.Context, pokemon string, typeId int) (Pokemon, error) {
+	name, err := s.repo.AssignType(ctx, pokemon, typeId)
+	if err != nil {
+		return Pokemon{}, err
+	}
+
+	return s.Get(ctx, name)
 }
