@@ -6,11 +6,13 @@ import (
 	"errors"
 	"learngo/pkg/services/users"
 	"learngo/pkg/services/users/store"
+	"learngo/pkg/utils/middlewares/cors"
 	"log"
 	"net/http"
 	"strconv"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/julienschmidt/httprouter"
 )
 
@@ -40,9 +42,10 @@ func newHandler(router *httprouter.Router, as users.Service, secret *string) {
 		Secret:      *secret,
 	}
 
-	router.POST("/users", h.Create)
-	router.POST("/users/login", h.Login)
-	router.POST("/users/logout", h.Logout)
+	router.POST("/users", cors.MiddleCORS(h.Create))
+	router.POST("/users/login", cors.MiddleCORS(h.Login))
+	router.POST("/users/logout", cors.MiddleCORS(h.Logout))
+	router.GET("/users/authenticate", cors.MiddleCORS(h.Authenticate))
 }
 
 func (h *handler) Create(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
@@ -82,6 +85,7 @@ func (h *handler) Login(w http.ResponseWriter, r *http.Request, params httproute
 	log.Printf("authenticating user %v", uc)
 	ut, err := h.UserService.LogIn(r.Context(), &uc, h.Secret)
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+
 	if err != nil {
 		status, message := handleError(err)
 		http.Error(w, message.Error(), status)
@@ -103,6 +107,8 @@ func (h *handler) Login(w http.ResponseWriter, r *http.Request, params httproute
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		panic(err)
 	}
+
+	w.WriteHeader(http.StatusOK)
 }
 
 func (h *handler) Logout(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
@@ -117,6 +123,46 @@ func (h *handler) Logout(w http.ResponseWriter, r *http.Request, params httprout
 	}
 
 	http.SetCookie(w, &cookie)
+}
+
+func (h *handler) Authenticate(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	claims := &users.Claims{}
+	token, err := r.Cookie("token")
+	if err != nil {
+		switch {
+		case errors.Is(err, http.ErrNoCookie):
+			http.Error(w, "cookie not found", http.StatusBadRequest)
+
+		default:
+			log.Println(err)
+			http.Error(w, "server error", http.StatusInternalServerError)
+		}
+		return
+	}
+
+	jwtoken, err := jwt.ParseWithClaims(token.Value, claims, func(token *jwt.Token) (interface{}, error) {
+		return []byte(h.Secret), nil
+	})
+
+	if err != nil {
+		log.Println(err)
+		http.Error(w, "server error.", http.StatusInternalServerError)
+		return
+	}
+
+	if !jwtoken.Valid {
+		http.Error(w, "invalid token.", http.StatusBadRequest)
+		return
+	}
+
+	type Wrapper struct {
+		IsAdmin bool `json:"is_admin"`
+	}
+
+	response := Wrapper{IsAdmin: claims.IsAdmin}
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		panic(err)
+	}
 }
 
 func handleError(e error) (int, error) {

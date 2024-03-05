@@ -18,7 +18,7 @@ func New(secret string) *authenticator {
 	return &authenticator{secret}
 }
 
-func (a *authenticator) Authenticate(n httprouter.Handle) httprouter.Handle {
+func (a *authenticator) Authorize(n httprouter.Handle) httprouter.Handle {
 	return func(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 		claims := &users.Claims{}
 		token, err := r.Cookie("token")

@@ -6,7 +6,8 @@ import (
 	"errors"
 	"learngo/pkg/services/pokemons"
 	"learngo/pkg/services/pokemons/store"
-	auth "learngo/pkg/utils/middlewares"
+	"learngo/pkg/utils/middlewares/auth"
+	"learngo/pkg/utils/middlewares/cors"
 	"log"
 	"net/http"
 	"strconv"
@@ -43,19 +44,19 @@ func newHandler(router *httprouter.Router, as pokemons.Service, secret *string) 
 
 	auth := auth.New(h.Secret)
 
-	router.GET("/pokemons/:name", h.Get)
-	router.GET("/pokemons", h.GetAll)
-	router.POST("/pokemons", auth.Authenticate(h.Create))
-	router.PUT("/pokemons/:name", auth.Authenticate(h.Update))
-	router.DELETE("/pokemons/:name", auth.Authenticate(h.Delete))
-	router.GET("/evolution_tree/:id", h.GetEvoTree)
-	router.POST("/evolution_tree", auth.Authenticate(h.CreateEvoTree))
-	router.PUT("/evolution_tree/:id", auth.Authenticate(h.InsertToEvoTree))
-	router.DELETE("/evolution_tree/:id", auth.Authenticate(h.DeleteFromEvoTree))
-	router.GET("/types", h.GetTypes)
-	router.GET("/types/:id", h.GetSameTypes)
-	router.POST("/types", auth.Authenticate(h.CreateType))
-	router.POST("/types/:id", auth.Authenticate(h.AssignType))
+	router.GET("/pokemons/:name", cors.MiddleCORS(h.Get))
+	router.GET("/pokemons", cors.MiddleCORS(h.GetAll))
+	router.POST("/pokemons", cors.MiddleCORS(auth.Authorize(h.Create)))
+	router.PUT("/pokemons/:name", cors.MiddleCORS(auth.Authorize(h.Update)))
+	router.DELETE("/pokemons/:name", cors.MiddleCORS(auth.Authorize(h.Delete)))
+	router.GET("/evolution_tree/:id", cors.MiddleCORS(h.GetEvoTree))
+	router.POST("/evolution_tree", cors.MiddleCORS(auth.Authorize(h.CreateEvoTree)))
+	router.PUT("/evolution_tree/:id", cors.MiddleCORS(auth.Authorize(h.InsertToEvoTree)))
+	router.DELETE("/evolution_tree/:id", cors.MiddleCORS(auth.Authorize(h.DeleteFromEvoTree)))
+	router.GET("/types", cors.MiddleCORS(h.GetTypes))
+	router.GET("/types/:id", cors.MiddleCORS(h.GetSameTypes))
+	router.POST("/types", cors.MiddleCORS(auth.Authorize(h.CreateType)))
+	router.POST("/types/:id", cors.MiddleCORS(auth.Authorize(h.AssignType)))
 }
 
 func (h *handler) Get(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
