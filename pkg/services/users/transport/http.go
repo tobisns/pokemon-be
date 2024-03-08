@@ -83,7 +83,7 @@ func (h *handler) Login(w http.ResponseWriter, r *http.Request, params httproute
 	}
 
 	log.Printf("authenticating user %v", uc)
-	ut, err := h.UserService.LogIn(r.Context(), &uc, h.Secret)
+	ut, isAdmin, err := h.UserService.LogIn(r.Context(), &uc, h.Secret)
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 
 	if err != nil {
@@ -103,7 +103,7 @@ func (h *handler) Login(w http.ResponseWriter, r *http.Request, params httproute
 	}
 
 	http.SetCookie(w, &cookie)
-	response := ut.ExpirationTime
+	response := users.UserLoginResponse{IsAdmin: isAdmin, ExpirationTime: ut.ExpirationTime}
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		panic(err)
 	}

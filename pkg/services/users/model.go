@@ -26,3 +26,8 @@ type UserToken struct {
 	Token          string    `josn:"token" binding:"required"`
 	ExpirationTime time.Time `json:"expiration_time" binding:"required"`
 }
+
+type UserLoginResponse struct {
+	IsAdmin        bool      `json:"is_admin"`
+	ExpirationTime time.Time `json:"expiration_time"`
+}

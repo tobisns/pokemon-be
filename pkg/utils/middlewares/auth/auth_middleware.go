@@ -50,6 +50,7 @@ func (a *authenticator) Authorize(n httprouter.Handle) httprouter.Handle {
 
 		if !claims.IsAdmin {
 			http.Error(w, "unauthorized request.", http.StatusBadRequest)
+			return
 		}
 		// call registered handler
 		n(w, r, ps)

@@ -19,7 +19,7 @@ type Repo interface {
 // outside this package can use to interact with Pokemon resources
 type Service interface {
 	Create(ctx context.Context, user *User) (UserResponse, error)
-	LogIn(ctx context.Context, user *User, secret string) (UserToken, error)
+	LogIn(ctx context.Context, user *User, secret string) (UserToken, bool, error)
 }
 
 type user struct {
@@ -41,7 +41,7 @@ func (s *user) Create(ctx context.Context, user *User) (UserResponse, error) {
 	return s.repo.Create(ctx, user.Username, hashedPassword)
 }
 
-func (s *user) LogIn(ctx context.Context, user *User, secret string) (UserToken, error) {
+func (s *user) LogIn(ctx context.Context, user *User, secret string) (UserToken, bool, error) {
 	h := sha256.New()
 	h.Write([]byte(user.Password))
 	bs := h.Sum(nil)
@@ -50,7 +50,7 @@ func (s *user) LogIn(ctx context.Context, user *User, secret string) (UserToken,
 
 	isAdmin, err := s.repo.Authenticate(ctx, user.Username, hashedPassword)
 	if err != nil {
-		return UserToken{}, err
+		return UserToken{}, false, err
 	}
 
 	expirationTime := time.Now().Add(10 * time.Minute)
@@ -65,8 +65,8 @@ func (s *user) LogIn(ctx context.Context, user *User, secret string) (UserToken,
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	tokenString, err := token.SignedString([]byte(secret))
 	if err != nil {
-		return UserToken{}, err
+		return UserToken{}, false, err
 	}
 
-	return UserToken{Token: tokenString, ExpirationTime: expirationTime}, nil
+	return UserToken{Token: tokenString, ExpirationTime: expirationTime}, isAdmin, nil
 }
