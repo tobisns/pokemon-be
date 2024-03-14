@@ -12,7 +12,7 @@ const (
 	selectManyPokemons  = `SELECT name, COALESCE(image_url, '') AS image_url FROM pokemons LIMIT $1 OFFSET $2`
 	searchPokemon       = `SELECT name, COALESCE(image_url, '') AS image_url FROM pokemons WHERE name LIKE '%' || $1 || '%' LIMIT $2 OFFSET $3`
 	insertPokemon       = `INSERT INTO pokemons (name, image_url, height, weight, hp, atk, def, sa, sd, spd) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING name`
-	updatePokemon       = `UPDATE pokemons SET name = $1, image_url = $2, height = $3, weight = $4, hp = $5, atk = $6, def = $7, sa = $8, sd = $9, spd = $10 WHERE name = $11`
+	updatePokemon       = `UPDATE pokemons SET image_url = $1, height = $2, weight = $3, hp = $4, atk = $5, def = $6, sa = $7, sd = $8, spd = $9 WHERE name = $10`
 	deletePokemon       = `DELETE FROM pokemons WHERE name=$1`
 	selectEvolutionTree = `SELECT id, level, pokemon_name FROM evo_tree WHERE id=$1`
 	newTreeId           = `SELECT new_tree() AS id`
@@ -104,7 +104,7 @@ func (r *pokemonRepo) Create(ctx context.Context, pr *pokemons.PokemonCreateUpda
 	return name, nil
 }
 func (r *pokemonRepo) Update(ctx context.Context, name string, pr *pokemons.PokemonCreateUpdate) error {
-	_, err := r.DB.Exec(updatePokemon, (*pr).Name, (*pr).ImageUrl, (*pr).Height, (*pr).Weight, (*pr).Stat.HealthPoint, (*pr).Stat.Attack, (*pr).Stat.Defense, (*pr).Stat.SpecialAttack, (*pr).Stat.SpecialDefense, (*pr).Stat.Speed, name)
+	_, err := r.DB.Exec(updatePokemon, (*pr).ImageUrl, (*pr).Height, (*pr).Weight, (*pr).Stat.HealthPoint, (*pr).Stat.Attack, (*pr).Stat.Defense, (*pr).Stat.SpecialAttack, (*pr).Stat.SpecialDefense, (*pr).Stat.Speed, name)
 	if err != nil {
 		log.Println(ctx, "unable to update pokemon (%s): %s", pr.Name, err.Error())
 		return pokemons.ErrUpdate
