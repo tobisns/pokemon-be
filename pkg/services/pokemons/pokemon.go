@@ -21,6 +21,7 @@ type Repo interface {
 	GetPokemonTypes(ctx context.Context, name string) (Types, error)
 	CreateType(ctx context.Context, name string) (Type, error)
 	AssignType(ctx context.Context, name string, typeId int) (string, error)
+	UnassignType(ctx context.Context, name string, typeId int) (string, error)
 }
 
 // Service defines the service level contract that other services
@@ -39,6 +40,7 @@ type Service interface {
 	GetSameTypes(ctx context.Context, id int) (TypePokemonResponse, error)
 	CreateType(ctx context.Context, name string) (Type, error)
 	AssignType(ctx context.Context, pokemon string, typeId int) (Pokemon, error)
+	UnassignType(ctx context.Context, pokemon string, typeId int) (Pokemon, error)
 }
 
 type pokemon struct {
@@ -150,6 +152,15 @@ func (s *pokemon) CreateType(ctx context.Context, name string) (Type, error) {
 
 func (s *pokemon) AssignType(ctx context.Context, pokemon string, typeId int) (Pokemon, error) {
 	name, err := s.repo.AssignType(ctx, pokemon, typeId)
+	if err != nil {
+		return Pokemon{}, err
+	}
+
+	return s.Get(ctx, name)
+}
+
+func (s *pokemon) UnassignType(ctx context.Context, pokemon string, typeId int) (Pokemon, error) {
+	name, err := s.repo.UnassignType(ctx, pokemon, typeId)
 	if err != nil {
 		return Pokemon{}, err
 	}

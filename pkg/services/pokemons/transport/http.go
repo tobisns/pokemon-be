@@ -57,6 +57,7 @@ func newHandler(router *httprouter.Router, as pokemons.Service, secret *string) 
 	router.GET("/types/:id", cors.MiddleCORS(h.GetSameTypes))
 	router.POST("/types", cors.MiddleCORS(auth.Authorize(h.CreateType)))
 	router.POST("/types/:id", cors.MiddleCORS(auth.Authorize(h.AssignType)))
+	router.DELETE("/types/:id", cors.MiddleCORS(auth.Authorize(h.UnassignType)))
 }
 
 func (h *handler) Get(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
@@ -350,6 +351,37 @@ func (h *handler) AssignType(w http.ResponseWriter, r *http.Request, params http
 
 	log.Printf("creating type %v", pn)
 	pokemon, err := h.PokemonService.AssignType(r.Context(), pn.Name, id)
+	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+	if err != nil {
+		status, message := handleError(err)
+		http.Error(w, message.Error(), status)
+		return
+	}
+
+	response := pokemon
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		panic(err)
+	}
+}
+
+func (h *handler) UnassignType(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
+	var pn pokemons.PokemonTypeCreateAssign
+
+	id, err := strconv.Atoi(params.ByName("id"))
+	if err != nil {
+		status, message := handleError(err)
+		http.Error(w, message.Error(), status)
+		return
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&pn); err != nil {
+		status, message := handleError(err)
+		http.Error(w, message.Error(), status)
+		return
+	}
+
+	log.Printf("removing type %v", pn)
+	pokemon, err := h.PokemonService.UnassignType(r.Context(), pn.Name, id)
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 	if err != nil {
 		status, message := handleError(err)

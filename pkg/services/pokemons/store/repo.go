@@ -22,6 +22,7 @@ const (
 	searchSameType      = `SELECT * FROM pokemon_type WHERE type_id=$1`
 	insertType          = `INSERT INTO type (name) VALUES ($1) RETURNING name, id`
 	insertPokemonType   = `INSERT INTO pokemon_type (pokemon, type_id) VALUES ($1, $2) RETURNING pokemon`
+	deletePokemonType   = `DELETE FROM pokemon_type WHERE pokemon=$1 AND type_id=$2 RETURNING pokemon`
 	selectPokemonTypes  = `SELECT pt.type_id, t.name FROM pokemon_type pt JOIN type t ON pt.type_id = t.id WHERE pt.pokemon=$1`
 )
 
@@ -304,6 +305,17 @@ func (r *pokemonRepo) AssignType(ctx context.Context, name string, typeId int) (
 	}
 
 	log.Println(ctx, "assigned type to name=%s", pn)
+	return pn, nil
+}
+
+func (r *pokemonRepo) UnassignType(ctx context.Context, name string, typeId int) (string, error) {
+	var pn string
+	if err := r.DB.QueryRow(deletePokemonType, name, typeId).Scan(&pn); err != nil {
+		log.Println(ctx, "unable to unassign type: %s", err.Error())
+		return "", pokemons.ErrCreate
+	}
+
+	log.Println(ctx, "unassigned type to name=%s", pn)
 	return pn, nil
 }
 
