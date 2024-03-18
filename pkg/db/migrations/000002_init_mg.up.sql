@@ -19,4 +19,4 @@ FROM (
 
 INSERT INTO type (name) VALUES ('grass'), ('fire'), ('water');
 
-INSERT INTO pokemon_type (pokemon, type_id) VALUES ('ini', 1), ('ibu', 1), ('budi', 1), ('budi', 2); 
+INSERT INTO pokemon_type (pokemon, type_id) VALUES ('ini', 1), ('ibu', 1), ('budi', 1), ('budi', 2);

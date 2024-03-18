@@ -13,8 +13,9 @@ type Pokemon struct {
 }
 
 type PokemonLight struct {
-	Name     string `json:"name" binding:"required"`
-	ImageUrl string `json:"image_url"`
+	Name      string `json:"name" binding:"required"`
+	ImageUrl  string `json:"image_url"`
+	EvoTreeId int    `json:"evo_tree_id"`
 }
 
 // Pokemons is used to present a list of pokemons in a JSON response.

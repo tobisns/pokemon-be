@@ -28,7 +28,7 @@ CREATE TABLE type (
 
 CREATE TABLE pokemon_type (
     pokemon VARCHAR(32) REFERENCES pokemons(name) ON DELETE CASCADE ON UPDATE CASCADE,
-    type_id INTEGER REFERENCES type(id),
+    type_id INTEGER REFERENCES type(id) ON DELETE CASCADE ON UPDATE CASCADE,
     PRIMARY KEY (pokemon, type_id)
 );
 

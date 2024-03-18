@@ -9,8 +9,8 @@ import (
 
 const (
 	selectPokemon       = `SELECT name, COALESCE(image_url, '') AS image_url, COALESCE(evo_tree_id, -1) AS evo_tree_id, COALESCE(height, 0) AS height, COALESCE(weight, 0) AS weight, COALESCE(hp, 0) as hp, COALESCE(atk, 0) AS atk, COALESCE(def, 0) AS def, COALESCE(sa, 0) AS sa, COALESCE(sd, 0) AS sd, COALESCE(spd, 0) AS spd FROM pokemons WHERE name=$1`
-	selectManyPokemons  = `SELECT name, COALESCE(image_url, '') AS image_url FROM pokemons LIMIT $1 OFFSET $2`
-	searchPokemon       = `SELECT name, COALESCE(image_url, '') AS image_url FROM pokemons WHERE name LIKE '%' || $1 || '%' LIMIT $2 OFFSET $3`
+	selectManyPokemons  = `SELECT name, COALESCE(image_url, '') AS image_url, evo_tree_id FROM pokemons LIMIT $1 OFFSET $2`
+	searchPokemon       = `SELECT name, COALESCE(image_url, '') AS image_url, evo_tree_id FROM pokemons WHERE name LIKE '%' || $1 || '%' LIMIT $2 OFFSET $3`
 	insertPokemon       = `INSERT INTO pokemons (name, image_url, height, weight, hp, atk, def, sa, sd, spd) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING name`
 	updatePokemon       = `UPDATE pokemons SET image_url = $1, height = $2, weight = $3, hp = $4, atk = $5, def = $6, sa = $7, sd = $8, spd = $9 WHERE name = $10`
 	deletePokemon       = `DELETE FROM pokemons WHERE name=$1`
@@ -61,7 +61,7 @@ func (r *pokemonRepo) GetAll(ctx context.Context, limit, offset int) (pokemons.P
 
 	for rows.Next() {
 		var pr pokemons.PokemonLight
-		if err := rows.Scan(&pr.Name, &pr.ImageUrl); err != nil {
+		if err := rows.Scan(&pr.Name, &pr.ImageUrl, &pr.EvoTreeId); err != nil {
 			log.Println(ctx, "unable to scan db rows: %s", err.Error())
 			return pl, pokemons.ErrDB
 		}
@@ -84,7 +84,7 @@ func (r *pokemonRepo) Find(ctx context.Context, query string, limit, offset int)
 
 	for rows.Next() {
 		var pr pokemons.PokemonLight
-		if err := rows.Scan(&pr.Name, &pr.ImageUrl); err != nil {
+		if err := rows.Scan(&pr.Name, &pr.ImageUrl, &pr.EvoTreeId); err != nil {
 			log.Println(ctx, "unable to scan db rows: %s", err.Error())
 			return pl, pokemons.ErrDB
 		}
